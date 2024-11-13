@@ -61,7 +61,7 @@ def fetch_ips(connection):
     Returns:
         list: A list of IP addresses as strings.
     """
-    ip_query = "SELECT CLNT_RMT_IP FROM tbl_iptrace_user_activity"
+    ip_query = "SELECT CLNT_RMT_IP FROM tbl_iptrace_user_activity where is_vpn is null"
     cursor = connection.cursor()
     cursor.execute(ip_query)
     ips = [row[0] for row in cursor.fetchall()]
