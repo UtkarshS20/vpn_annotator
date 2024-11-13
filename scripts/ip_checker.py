@@ -2,7 +2,7 @@ import os
 import json
 import ipaddress
 import time
-from db_utils import create_local_connection, fetch_cidr_ranges
+from db_utils import create_local_connection, fetch_cidr_ranges, fetch_ips, create_ebay_connection, update_is_vpn
 from dotenv import load_dotenv
 from multiprocessing import Pool
 
@@ -27,88 +27,73 @@ def check_ip_in_cidr(ip, cidr_networks):
     """
     ip_obj = ipaddress.IPv4Address(ip)
     
-    # Faster comparison using IPv4Network objects
     for network in cidr_networks:
         if ip_obj in network:
-            return True  # IP is within this CIDR range
-    return False  # IP doesn't belong to any CIDR range
+            return True
+    return False
 
-def process_single_file(filename, data_folder, cidr_networks, results_folder):
-    """
-    Process a single file and check the IPs against the CIDR ranges.
-    """
-    file_start_time = time.time()  # Start time for each file
-    filepath = os.path.join(data_folder, filename)
-    with open(filepath, 'r') as file:
-        ip_data = json.load(file)
 
-    # Initialize results dictionary for the current file
-    results = {}
+def process_ips(ip_list, cidr_networks):
+    """
+    Process a list of IPs and check each one against the CIDR ranges, 
+    updating the is_vpn field in the eBay DB.
+    """
+    ebay_connection = create_ebay_connection()  
+    if not ebay_connection:
+        print("Failed to connect to eBay database.")
+        return
+    
     ip_check_start_time = time.time()
 
-    # Checking each IP (batch processing could be done here for further optimization)
-    for ip in ip_data.get("ip_address", []):
+    for ip in ip_list:
         is_vpn = check_ip_in_cidr(ip, cidr_networks)
-        results[ip] = {"is_vpn": is_vpn}
+        update_is_vpn(ebay_connection, ip, is_vpn)
 
     ip_check_end_time = time.time()
-    print(f"Time to check all IPs in {filename}: {ip_check_end_time - ip_check_start_time:.2f} seconds")
+    print(f"Time to check all IPs and update eBay DB: {ip_check_end_time - ip_check_start_time:.2f} seconds")
 
-    # Create a unique result file name based on the input file name
-    result_filename = f"{os.path.splitext(filename)[0]}_results.json"
-    result_filepath = os.path.join(results_folder, result_filename)
+    ebay_connection.close()
 
-    # Ensure the results folder exists, then save the result file
-    os.makedirs(results_folder, exist_ok=True)
-    file_save_start_time = time.time()
 
-    with open(result_filepath, 'w') as outfile:
-        json.dump(results, outfile, indent=4)
-
-    file_save_end_time = time.time()
-    print(f"Time to save results for {filename}: {file_save_end_time - file_save_start_time:.2f} seconds")
-
-    print(f"Results saved to {result_filepath}")
-    file_end_time = time.time()
-    print(f"Total time for {filename}: {file_end_time - file_start_time:.2f} seconds")
-
-def process_ip_files(data_folder, cidr_networks, results_folder):
+def process_ips_in_parallel(ip_list, cidr_networks):
     """
-    Use multiprocessing to process multiple files in parallel.
+    Use multiprocessing to process multiple IPs in parallel and update the eBay DB.
     """
-    filenames = [filename for filename in os.listdir(data_folder) if filename.endswith(".json")]
+    chunk_size = 100
+    ip_chunks = [ip_list[i:i + chunk_size] for i in range(0, len(ip_list), chunk_size)]
 
-    # Create a pool of workers to process files in parallel
     with Pool() as pool:
-        pool.starmap(process_single_file, [(filename, data_folder, cidr_networks, results_folder) for filename in filenames])
+        pool.starmap(process_ips, [(chunk, cidr_networks) for chunk in ip_chunks])
+
 
 def main():
     start_time = time.time()
     print(f"Script started at {start_time}")
 
-    # Create a database connection
-    connection = create_local_connection()
-    if connection is None:
-        print("Failed to connect to database.")
+    local_connection = create_local_connection()
+    if local_connection is None:
+        print("Failed to connect to local database.")
         return
 
-    # Fetch and preprocess CIDR ranges from database
     cidr_fetch_start_time = time.time()
-    cidr_ranges = fetch_cidr_ranges(connection)
-    connection.close()
+    cidr_ranges = fetch_cidr_ranges(local_connection)
+    local_connection.close()
     
-    # Preprocess CIDR ranges for faster lookup
     cidr_networks = preprocess_cidr_ranges(cidr_ranges)
     
     cidr_fetch_end_time = time.time()
     print(f"Time to fetch and preprocess CIDR ranges from DB: {cidr_fetch_end_time - cidr_fetch_start_time:.2f} seconds")
 
-    # Process IP files using multiprocessing
-    data_folder = os.getenv("DATA_FOLDER")
-    results_folder = os.getenv("RESULTS_FOLDER")
-    process_ip_files(data_folder, cidr_networks, results_folder)
+    ebay_connection = create_ebay_connection()
+    if ebay_connection is None:
+        print("Failed to connect to eBay database.")
+        return
 
-    # Calculate and display execution time
+    ip_list = fetch_ips(ebay_connection)
+    print(f"Fetched {len(ip_list)} IPs.")
+
+    process_ips_in_parallel(ip_list, cidr_networks)
+
     end_time = time.time()
     execution_time = end_time - start_time
     print(f"Script execution time: {execution_time:.2f} seconds")
