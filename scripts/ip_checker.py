@@ -2,7 +2,7 @@ import os
 import json
 import ipaddress
 import time
-from db_utils import create_connection, fetch_cidr_ranges
+from db_utils import create_local_connection, fetch_cidr_ranges
 from dotenv import load_dotenv
 from multiprocessing import Pool
 
@@ -87,7 +87,7 @@ def main():
     print(f"Script started at {start_time}")
 
     # Create a database connection
-    connection = create_connection()
+    connection = create_local_connection()
     if connection is None:
         print("Failed to connect to database.")
         return

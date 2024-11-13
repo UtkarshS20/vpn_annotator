@@ -3,3 +3,4 @@ mysql-connector-python==9.1.0
 python-dotenv==1.0.1
 PyYAML==6.0.2
 requests==2.32.3
+pyodbc==5.2.0
