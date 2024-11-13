@@ -32,12 +32,12 @@ def check_ip_in_cidr(ip, cidr_networks):
             return True
     return False
 
-
 def process_ips(ip_list, cidr_networks):
     """
     Process a list of IPs and check each one against the CIDR ranges, 
     updating the is_vpn field in the eBay DB.
     """
+    ip_list = list(set(ip_list))
     ebay_connection = create_ebay_connection()  
     if not ebay_connection:
         print("Failed to connect to eBay database.")
@@ -53,7 +53,6 @@ def process_ips(ip_list, cidr_networks):
     print(f"Time to check all IPs and update eBay DB: {ip_check_end_time - ip_check_start_time:.2f} seconds")
 
     ebay_connection.close()
-
 
 def process_ips_in_parallel(ip_list, cidr_networks):
     """

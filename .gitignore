@@ -3,3 +3,4 @@ test.txt
 results/
 data/
 .env
+__pycache__/
