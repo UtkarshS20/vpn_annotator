@@ -93,3 +93,7 @@ def update_is_vpn(ebay_connection, ip, is_vpn):
     except Exception as e:
         print(f"Error updating is_vpn for IP {ip}: {e}")
         ebay_connection.rollback()
+
+
+
+# print(create_ebay_connection())

@@ -4,7 +4,7 @@ import ipaddress
 import time
 from db_utils import create_local_connection, fetch_cidr_ranges, fetch_ips, create_ebay_connection, update_is_vpn
 from dotenv import load_dotenv
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 
 load_dotenv()
 
@@ -58,10 +58,10 @@ def process_ips_in_parallel(ip_list, cidr_networks):
     """
     Use multiprocessing to process multiple IPs in parallel and update the eBay DB.
     """
-    chunk_size = 100
+    chunk_size = 1000
     ip_chunks = [ip_list[i:i + chunk_size] for i in range(0, len(ip_list), chunk_size)]
 
-    with Pool() as pool:
+    with Pool(processes=cpu_count()) as pool:
         pool.starmap(process_ips, [(chunk, cidr_networks) for chunk in ip_chunks])
 
 
