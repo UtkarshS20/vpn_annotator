@@ -6,3 +6,6 @@ requests==2.32.3
 pyodbc==5.2.0
 dask==2024.11.2
 dask[dataframe]
+scikit-learn==1.5.2
+seaborn==0.13.2
+matplotlib==3.9.2
